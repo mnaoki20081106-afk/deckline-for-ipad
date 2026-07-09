@@ -1,0 +1,16 @@
+{
+  "even_decks": [
+    {
+      "name": "デッキ名をここに入力",
+      "deadline": "2026-09-01",
+      "min_per_day": 0,
+      "max_per_day": 9999
+    }
+  ],
+  "sequential_groups": [
+    {
+      "deadline": "2026-09-01",
+      "decks": ["デッキ名A", "デッキ名B"]
+    }
+  ]
+}

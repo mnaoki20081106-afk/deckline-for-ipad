@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deckline 設定</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --board:#1E2723;
+    --board-2:#26312B;
+    --board-3:#2F3B34;
+    --chalk:#E9EFE8;
+    --chalk-dim:#A9B8AE;
+    --amber:#F0C05A;
+    --sage:#7FA98D;
+    --line:#3C4A42;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--board);
+    color:var(--chalk);
+    font-family:-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    min-height:100vh;
+    padding-bottom:80px;
+  }
+  header{
+    padding:28px 20px 16px;
+    border-bottom:1px dashed var(--line);
+    position:sticky; top:0;
+    background:var(--board);
+    z-index:5;
+  }
+  h1{
+    font-family:'Kalam', cursive;
+    font-size:28px;
+    margin:0 0 4px;
+    color:var(--amber);
+    letter-spacing:0.3px;
+  }
+  header p{
+    margin:0;
+    color:var(--chalk-dim);
+    font-size:13px;
+  }
+  .gear{
+    position:absolute; top:24px; right:18px;
+    background:none; border:1px solid var(--line);
+    color:var(--chalk-dim); border-radius:10px;
+    width:40px; height:40px; font-size:18px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  main{ padding:18px 16px 40px; max-width:640px; margin:0 auto; }
+  .card{
+    background:var(--board-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:15px;
+    margin:0 0 4px;
+    color:var(--chalk);
+    display:flex; align-items:center; gap:8px;
+  }
+  .card .desc{
+    font-size:12.5px; color:var(--chalk-dim); margin:0 0 14px; line-height:1.6;
+  }
+  .mode-toggle{
+    display:flex; gap:8px; margin-bottom:18px;
+  }
+  .mode-toggle button{
+    flex:1; padding:14px 8px; border-radius:10px;
+    border:1px solid var(--line); background:var(--board-3);
+    color:var(--chalk-dim); font-size:13px; font-weight:600;
+  }
+  .mode-toggle button.active{
+    border-color:var(--amber); color:var(--board); background:var(--amber);
+  }
+  .row{
+    display:flex; flex-direction:column; gap:6px; margin-bottom:14px;
+  }
+  label{ font-size:12.5px; color:var(--chalk-dim); }
+  select, input[type=date], input[type=text], input[type=number], input[type=password]{
+    background:var(--board-3); border:1px solid var(--line); color:var(--chalk);
+    padding:12px 10px; border-radius:10px; font-size:15px; width:100%;
+  }
+  .deck-entry{
+    background:var(--board-3); border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:12px;
+  }
+  .deck-entry-top{
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;
+  }
+  .deck-entry-top .name{ font-weight:600; font-size:14.5px; }
+  .badge{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11.5px; color:var(--board); background:var(--sage);
+    padding:3px 8px; border-radius:6px;
+  }
+  .remove-btn{
+    background:none; border:none; color:var(--chalk-dim); font-size:18px; padding:4px 8px;
+  }
+  .add-btn{
+    width:100%; padding:14px; border-radius:10px; border:1px dashed var(--line);
+    background:transparent; color:var(--chalk-dim); font-size:14px; margin-top:4px;
+  }
+  .seq-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:8px; }
+  .seq-item{
+    display:flex; align-items:center; gap:10px;
+    background:var(--board); border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  }
+  .seq-item .order{
+    font-family:'JetBrains Mono', monospace; color:var(--amber); font-size:13px; width:20px;
+  }
+  .seq-item .n{ flex:1; font-size:14px; }
+  .seq-item .arrows{ display:flex; gap:4px; }
+  .seq-item .arrows button{
+    background:none; border:1px solid var(--line); color:var(--chalk-dim);
+    width:30px; height:30px; border-radius:8px; font-size:14px;
+  }
+  .group-card{
+    border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; background:var(--board-3);
+  }
+  footer{
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--board-2); border-top:1px solid var(--line);
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    display:flex; gap:10px;
+  }
+  .save-btn{
+    flex:1; padding:15px; border-radius:12px; border:none;
+    background:var(--amber); color:#22281D; font-weight:700; font-size:15px;
+  }
+  .status{
+    font-size:12.5px; color:var(--chalk-dim); text-align:center; margin-top:8px;
+  }
+  .status.ok{ color:var(--sage); }
+  .status.err{ color:#E08585; }
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6);
+    display:none; align-items:flex-end; justify-content:center; z-index:20;
+  }
+  .overlay.show{ display:flex; }
+  .sheet{
+    background:var(--board-2); width:100%; max-width:640px;
+    border-radius:18px 18px 0 0; padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+  }
+  .sheet h3{ margin:0 0 12px; font-size:16px; }
+  .sheet .row small{ color:var(--chalk-dim); font-size:11.5px; }
+  .close-sheet{
+    margin-top:10px; width:100%; padding:13px; border-radius:10px; border:1px solid var(--line);
+    background:transparent; color:var(--chalk-dim);
+  }
+  .empty{ color:var(--chalk-dim); font-size:13px; padding:8px 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Deckline 設定</h1>
+  <p>締切から逆算して、新規カードの枚数を自動調整します</p>
+  <button class="gear" id="openSettings">⚙</button>
+</header>
+
+<main>
+
+  <div class="card">
+    <h2>進め方</h2>
+    <p class="desc">複数デッキがある場合、それぞれ独立して進めるか、順番に1つずつ終わらせるか選べます。</p>
+    <div class="mode-toggle">
+      <button id="tabEven" class="active">満遍なく進める</button>
+      <button id="tabSeq">1つずつ終わらせる</button>
+    </div>
+  </div>
+
+  <div id="evenPane">
+    <div class="card">
+      <h2>均等モードのデッキ</h2>
+      <p class="desc">デッキごとに締切日を設定します。各デッキが並行して、それぞれの締切に間に合うペースで進みます。</p>
+      <div id="evenList"></div>
+      <button class="add-btn" id="addEvenDeck">+ デッキを追加</button>
+    </div>
+  </div>
+
+  <div id="seqPane" style="display:none;">
+    <div class="card">
+      <h2>順番モードのグループ</h2>
+      <p class="desc">グループ内のデッキで1つの締切を共有し、上から順番に終わらせます。今日の新規カード予算は、上のデッキから使い切られます。</p>
+      <div id="seqGroups"></div>
+      <button class="add-btn" id="addSeqGroup">+ グループを追加</button>
+    </div>
+  </div>
+
+  <div class="status" id="deckListStatus"></div>
+
+</main>
+
+<footer>
+  <div style="flex:1">
+    <button class="save-btn" id="saveBtn">保存してAnkiWebに反映</button>
+    <div class="status" id="saveStatus"></div>
+  </div>
+</footer>
+
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <h3>リポジトリ接続設定</h3>
+    <div class="row">
+      <label>GitHubユーザー名 / Organization</label>
+      <input type="text" id="ghOwner" placeholder="例: taro-yamada">
+    </div>
+    <div class="row">
+      <label>リポジトリ名</label>
+      <input type="text" id="ghRepo" placeholder="例: deckline-auto">
+    </div>
+    <div class="row">
+      <label>Personal Access Token(このリポジトリのContents権限)</label>
+      <input type="password" id="ghToken" placeholder="ghp_...">
+      <small>この端末のブラウザにのみ保存されます。他の端末では入力し直してください。</small>
+    </div>
+    <button class="close-sheet" id="closeSettings">閉じる(自動保存されます)</button>
+  </div>
+</div>
+
+<script>
+const LS_OWNER = 'deckline_owner';
+const LS_REPO = 'deckline_repo';
+const LS_TOKEN = 'deckline_token';
+
+const $ = (id) => document.getElementById(id);
+
+let deckNames = [];
+let config = { even_decks: [], sequential_groups: [] };
+let configSha = null;
+
+function ghConf(){
+  return {
+    owner: localStorage.getItem(LS_OWNER) || '',
+    repo: localStorage.getItem(LS_REPO) || '',
+    token: localStorage.getItem(LS_TOKEN) || '',
+  };
+}
+
+function ghHeaders(token){
+  return {
+    'Authorization': 'Bearer ' + token,
+    'Accept': 'application/vnd.github+json',
+  };
+}
+
+function b64DecodeUnicode(str){
+  return decodeURIComponent(Array.prototype.map.call(atob(str), (c) =>
+    '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+  ).join(''));
+}
+
+function b64EncodeUnicode(str){
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) =>
+    String.fromCharCode('0x' + p1)
+  ));
+}
+
+async function ghGetFile(path){
+  const {owner, repo, token} = ghConf();
+  if(!owner || !repo || !token) throw new Error('リポジトリ接続設定が未入力です(右上の歯車アイコン)');
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+    headers: ghHeaders(token),
+  });
+  if(res.status === 404) return null;
+  if(!res.ok) throw new Error(`GitHub API エラー (${path}): ${res.status}`);
+  const data = await res.json();
+  return { content: JSON.parse(b64DecodeUnicode(data.content)), sha: data.sha };
+}
+
+async function ghPutFile(path, obj, sha){
+  const {owner, repo, token} = ghConf();
+  const body = {
+    message: `deckline: update ${path}`,
+    content: b64EncodeUnicode(JSON.stringify(obj, null, 2)),
+  };
+  if(sha) body.sha = sha;
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error(`保存に失敗しました (${path}): ${res.status} ${t}`);
+  }
+  return res.json();
+}
+
+async function loadAll(){
+  $('deckListStatus').textContent = '読み込み中...';
+  try{
+    const decksFile = await ghGetFile('decks.json');
+    deckNames = decksFile ? (decksFile.content.decks || []) : [];
+
+    const cfgFile = await ghGetFile('config.json');
+    if(cfgFile){
+      config = cfgFile.content;
+      configSha = cfgFile.sha;
+      if(config.decks && !config.even_decks){ config.even_decks = config.decks; }
+      config.even_decks = config.even_decks || [];
+      config.sequential_groups = config.sequential_groups || [];
+    }
+
+    $('deckListStatus').textContent = deckNames.length
+      ? `デッキ一覧: ${deckNames.length}件(最終同期: ${decksFile.content.updated_at ? new Date(decksFile.content.updated_at).toLocaleString('ja-JP') : '不明'})`
+      : 'デッキ一覧がまだありません。一度GitHub Actionsを手動実行してください。';
+
+    renderEven();
+    renderSeq();
+  }catch(e){
+    $('deckListStatus').textContent = '';
+    showStatus('saveStatus', e.message, 'err');
+  }
+}
+
+function deckSelectHtml(selected){
+  const opts = deckNames.map(n => `<option value="${escapeHtml(n)}" ${n===selected?'selected':''}>${escapeHtml(n)}</option>`).join('');
+  const custom = selected && !deckNames.includes(selected) ? `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)}(手入力)</option>` : '';
+  return `<option value="">デッキを選択...</option>${custom}${opts}`;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderEven(){
+  const el = $('evenList');
+  if(config.even_decks.length === 0){
+    el.innerHTML = '<div class="empty">まだデッキがありません。「+ デッキを追加」から追加してください。</div>';
+    return;
+  }
+  el.innerHTML = config.even_decks.map((d, i) => `
+    <div class="deck-entry" data-idx="${i}">
+      <div class="deck-entry-top">
+        <span class="badge">締切まで自動計算</span>
+        <button class="remove-btn" data-remove-even="${i}">✕</button>
+      </div>
+      <div class="row">
+        <label>デッキ</label>
+        <select data-even-name="${i}">${deckSelectHtml(d.name)}</select>
+      </div>
+      <div class="row">
+        <label>締切日</label>
+        <input type="date" data-even-deadline="${i}" value="${d.deadline || ''}">
+      </div>
+    </div>
+  `).join('');
+
+  el.querySelectorAll('[data-even-name]').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      config.even_decks[+e.target.dataset.evenName].name = e.target.value;
+    });
+  });
+  el.querySelectorAll('[data-even-deadline]').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      config.even_decks[+e.target.dataset.evenDeadline].deadline = e.target.value;
+    });
+  });
+  el.querySelectorAll('[data-remove-even]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      config.even_decks.splice(+e.target.dataset.removeEven, 1);
+      renderEven();
+    });
+  });
+}
+
+function renderSeq(){
+  const el = $('seqGroups');
+  if(config.sequential_groups.length === 0){
+    el.innerHTML = '<div class="empty">まだグループがありません。「+ グループを追加」から追加してください。</div>';
+    return;
+  }
+  el.innerHTML = config.sequential_groups.map((g, gi) => `
+    <div class="group-card" data-gidx="${gi}">
+      <div class="deck-entry-top">
+        <span class="badge">グループ ${gi+1}</span>
+        <button class="remove-btn" data-remove-group="${gi}">✕</button>
+      </div>
+      <div class="row">
+        <label>このグループ共通の締切日</label>
+        <input type="date" data-group-deadline="${gi}" value="${g.deadline || ''}">
+      </div>
+      <label>デッキの順番(上から順に終わらせます)</label>
+      <div class="seq-list">
+        ${g.decks.map((name, di) => `
+          <div class="seq-item">
+            <span class="order">${di+1}</span>
+            <select class="n" data-group="${gi}" data-deck-idx="${di}">${deckSelectHtml(name)}</select>
+            <div class="arrows">
+              <button data-up="${gi}:${di}" ${di===0?'disabled':''}>↑</button>
+              <button data-down="${gi}:${di}" ${di===g.decks.length-1?'disabled':''}>↓</button>
+              <button data-remove-deck="${gi}:${di}">✕</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <button class="add-btn" data-add-deck-to="${gi}">+ このグループにデッキを追加</button>
+    </div>
+  `).join('');
+
+  el.querySelectorAll('[data-group-deadline]').forEach(inp => {
+    inp.addEventListener('change', (e) => {
+      config.sequential_groups[+e.target.dataset.groupDeadline].deadline = e.target.value;
+    });
+  });
+  el.querySelectorAll('select[data-group]').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      config.sequential_groups[+e.target.dataset.group].decks[+e.target.dataset.deckIdx] = e.target.value;
+    });
+  });
+  el.querySelectorAll('[data-remove-group]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      config.sequential_groups.splice(+e.target.dataset.removeGroup, 1);
+      renderSeq();
+    });
+  });
+  el.querySelectorAll('[data-add-deck-to]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      config.sequential_groups[+e.target.dataset.addDeckTo].decks.push('');
+      renderSeq();
+    });
+  });
+  el.querySelectorAll('[data-remove-deck]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const [gi, di] = e.target.dataset.removeDeck.split(':').map(Number);
+      config.sequential_groups[gi].decks.splice(di, 1);
+      renderSeq();
+    });
+  });
+  el.querySelectorAll('[data-up]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const [gi, di] = e.target.dataset.up.split(':').map(Number);
+      const arr = config.sequential_groups[gi].decks;
+      [arr[di-1], arr[di]] = [arr[di], arr[di-1]];
+      renderSeq();
+    });
+  });
+  el.querySelectorAll('[data-down]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const [gi, di] = e.target.dataset.down.split(':').map(Number);
+      const arr = config.sequential_groups[gi].decks;
+      [arr[di+1], arr[di]] = [arr[di], arr[di+1]];
+      renderSeq();
+    });
+  });
+}
+
+function showStatus(id, msg, cls){
+  const el = $(id);
+  el.textContent = msg;
+  el.className = 'status ' + (cls || '');
+}
+
+$('tabEven').addEventListener('click', () => {
+  $('tabEven').classList.add('active');
+  $('tabSeq').classList.remove('active');
+  $('evenPane').style.display = '';
+  $('seqPane').style.display = 'none';
+});
+$('tabSeq').addEventListener('click', () => {
+  $('tabSeq').classList.add('active');
+  $('tabEven').classList.remove('active');
+  $('seqPane').style.display = '';
+  $('evenPane').style.display = 'none';
+});
+
+$('addEvenDeck').addEventListener('click', () => {
+  const today = new Date();
+  today.setMonth(today.getMonth() + 1);
+  config.even_decks.push({ name: '', deadline: today.toISOString().slice(0,10), min_per_day: 0, max_per_day: 9999 });
+  renderEven();
+});
+
+$('addSeqGroup').addEventListener('click', () => {
+  const today = new Date();
+  today.setMonth(today.getMonth() + 1);
+  config.sequential_groups.push({ deadline: today.toISOString().slice(0,10), decks: [''] });
+  renderSeq();
+});
+
+$('saveBtn').addEventListener('click', async () => {
+  showStatus('saveStatus', '保存中...', '');
+  try{
+    const cleanConfig = {
+      even_decks: config.even_decks.filter(d => d.name && d.deadline),
+      sequential_groups: config.sequential_groups
+        .map(g => ({ deadline: g.deadline, decks: g.decks.filter(Boolean) }))
+        .filter(g => g.deadline && g.decks.length > 0),
+    };
+    const result = await ghPutFile('config.json', cleanConfig, configSha);
+    configSha = result.content.sha;
+    showStatus('saveStatus', '保存しました。次回のGitHub Actions実行(手動 or 毎日の自動実行)で反映されます。', 'ok');
+  }catch(e){
+    showStatus('saveStatus', e.message, 'err');
+  }
+});
+
+$('openSettings').addEventListener('click', () => {
+  const {owner, repo, token} = ghConf();
+  $('ghOwner').value = owner;
+  $('ghRepo').value = repo;
+  $('ghToken').value = token;
+  $('settingsOverlay').classList.add('show');
+});
+$('closeSettings').addEventListener('click', () => {
+  localStorage.setItem(LS_OWNER, $('ghOwner').value.trim());
+  localStorage.setItem(LS_REPO, $('ghRepo').value.trim());
+  localStorage.setItem(LS_TOKEN, $('ghToken').value.trim());
+  $('settingsOverlay').classList.remove('show');
+  loadAll();
+});
+
+// 初回起動時、接続設定が空なら設定シートを開く
+const initial = ghConf();
+if(!initial.owner || !initial.repo || !initial.token){
+  $('openSettings').click();
+}else{
+  loadAll();
+}
+</script>
+</body>
+</html>
