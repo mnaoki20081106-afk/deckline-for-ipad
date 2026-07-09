@@ -31,6 +31,7 @@ import json
 import math
 import os
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 
@@ -60,6 +61,27 @@ def load_config() -> dict:
     return cfg
 
 
+def _full_sync_with_retry(col: Collection, auth, server_usn, upload: bool, attempts: int = 3) -> None:
+    """
+    full_upload_or_download は、特に初回実行時に
+    "HttpError: missing original size" で失敗することがある
+    (AnkiDroid側でも同様の既知の初回同期不具合が報告されている)。
+    再実行すると成功することが多いため、簡単なリトライを行う。
+    """
+    last_err = None
+    for i in range(1, attempts + 1):
+        try:
+            col.full_upload_or_download(auth=auth, server_usn=server_usn, upload=upload)
+            return
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            log(f"full_upload_or_download 失敗(試行{i}/{attempts}): {e}")
+            if i < attempts:
+                time.sleep(5 * i)
+                col.close_for_full_sync()
+    raise last_err
+
+
 def do_sync(col: Collection, auth) -> None:
     """通常同期を実行し、必要ならfull download/uploadにフォールバックする"""
     out = col.sync_collection(auth, False)  # media同期はしない(軽量化)
@@ -73,18 +95,18 @@ def do_sync(col: Collection, auth) -> None:
     if out.required == out.FULL_DOWNLOAD:
         log("初回 or サーバー側が最新のため FULL_DOWNLOAD を実行します")
         col.close_for_full_sync()
-        col.full_upload_or_download(auth=auth, server_usn=server_usn, upload=False)
+        _full_sync_with_retry(col, auth, server_usn, upload=False)
     elif out.required == out.FULL_UPLOAD:
         log("ローカル側が最新のため FULL_UPLOAD を実行します")
         col.close_for_full_sync()
-        col.full_upload_or_download(auth=auth, server_usn=server_usn, upload=True)
+        _full_sync_with_retry(col, auth, server_usn, upload=True)
     else:
         # 本来はデスクトップ版がユーザーに upload/download を確認するケース。
         # 無人実行では安全側に倒し、絶対にサーバーのデータを消さないよう
         # "download" (サーバーを正として取り込む) をデフォルトにする。
         log("警告: 通常はユーザー確認が必要な競合状態です。安全のためdownloadを選択します。")
         col.close_for_full_sync()
-        col.full_upload_or_download(auth=auth, server_usn=server_usn, upload=False)
+        _full_sync_with_retry(col, auth, server_usn, upload=False)
 
 
 def days_left_until(deadline_str: str) -> int:
