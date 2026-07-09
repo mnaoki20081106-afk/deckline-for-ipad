@@ -1,0 +1,45 @@
+name: Deckline auto-adjust
+
+on:
+  workflow_dispatch: {}   # 手動実行ボタン(最初はこれでテストしてください)
+  schedule:
+    # 毎日 21:00 JST (= 12:00 UTC) に実行。時間を変えたい場合はここを編集
+    - cron: "0 12 * * *"
+
+permissions:
+  contents: write   # decks.json を自動コミットするために必要
+
+jobs:
+  adjust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore cached collection (2回目以降は高速化)
+        uses: actions/cache@v4
+        with:
+          path: collection.anki2
+          key: deckline-collection-v1
+
+      - name: Run adjuster
+        env:
+          ANKIWEB_USERNAME: ${{ secrets.ANKIWEB_USERNAME }}
+          ANKIWEB_PASSWORD: ${{ secrets.ANKIWEB_PASSWORD }}
+        run: python adjust_deck_limits.py
+
+      - name: Commit updated deck list
+        run: |
+          git config user.name "deckline-bot"
+          git config user.email "deckline-bot@users.noreply.github.com"
+          git add decks.json
+          git diff --cached --quiet || git commit -m "deckline: update deck list"
+          git push
