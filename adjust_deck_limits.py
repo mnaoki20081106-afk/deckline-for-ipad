@@ -84,7 +84,7 @@ def _full_sync_with_retry(col: Collection, auth, server_usn, upload: bool, attem
 
 def do_sync(col: Collection, auth) -> None:
     """通常同期を実行し、必要ならfull download/uploadにフォールバックする"""
-    out = col.sync_collection(auth, False)  # media同期はしない(軽量化)
+    out = col.sync_collection(auth, True)  # メディア同期も有効化(フル同期時のサイズ情報欠落を防ぐ)
 
     if out.required == out.NO_CHANGES:
         log("同期完了(差分なし、または通常マージ済み)")
