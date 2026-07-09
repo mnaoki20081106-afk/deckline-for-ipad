@@ -61,52 +61,99 @@ def load_config() -> dict:
     return cfg
 
 
-def _full_sync_with_retry(col: Collection, auth, server_usn, upload: bool, attempts: int = 3) -> None:
+def _wipe_local_collection(path: str) -> None:
+    """ローカルのコレクションファイルとSQLite付随ファイルを削除し、まっさらな状態に戻す"""
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        p = Path(path + suffix)
+        if p.exists():
+            p.unlink()
+
+
+def initial_login_and_sync(username: str, password: str, path: str, attempts: int = 4) -> tuple[Collection, object]:
     """
-    full_upload_or_download は、特に初回実行時に
-    "HttpError: missing original size" で失敗することがある
-    (AnkiDroid側でも同様の既知の初回同期不具合が報告されている)。
-    再実行すると成功することが多いため、簡単なリトライを行う。
+    ログイン→同期を行い、使える状態のコレクションを返す。
+
+    初回のフル同期(FULL_DOWNLOAD)は "HttpError: missing original size" で
+    失敗することがある(AnkiDroid側でも同様の既知の初回同期不具合が報告されている)。
+    単純な再試行では直らなかったため、失敗のたびにローカルのコレクションを
+    削除して作り直し、ログインからやり直す(=デスクトップ版を閉じて再起動する
+    のに近い状態)ことで回復を試みる。
+    """
+    last_err = None
+    for i in range(1, attempts + 1):
+        if i > 1:
+            # 失敗した場合のみ、まっさらな状態に作り直して再ログインする
+            _wipe_local_collection(path)
+        col = Collection(path)
+        try:
+            log(f"AnkiWebにログイン中... (試行{i}/{attempts})")
+            auth = col.sync_login(username=username, password=password, endpoint=None)
+
+            log("同期(取得)を実行中...")
+            out = col.sync_collection(auth, True)  # メディア同期も有効化
+
+            if out.required == out.NO_CHANGES:
+                log("同期完了(差分なし、または通常マージ済み)")
+                return col, auth
+
+            server_usn = out.server_media_usn if hasattr(out, "server_media_usn") else None
+
+            if out.required == out.FULL_UPLOAD:
+                log("ローカル側が最新のため FULL_UPLOAD を実行します")
+                upload = True
+            else:
+                # FULL_DOWNLOAD、またはユーザー確認が本来必要な競合状態。
+                # 無人実行では安全側に倒し、サーバーのデータを消さないよう download を選ぶ。
+                log("FULL_DOWNLOAD を実行します(競合状態の場合は安全のためdownloadを選択)")
+                upload = False
+
+            col.close_for_full_sync()
+            col.full_upload_or_download(auth=auth, server_usn=server_usn, upload=upload)
+
+            col = Collection(path)
+            return col, auth
+
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            log(f"同期に失敗しました(試行{i}/{attempts}): {e}")
+            try:
+                col.close()
+            except Exception:  # noqa: BLE001
+                pass
+            if i < attempts:
+                wait = 10 * i
+                log(f"{wait}秒待ってから、コレクションを作り直して再試行します...")
+                time.sleep(wait)
+
+    raise last_err
+
+
+def push_changes(col: Collection, auth, attempts: int = 3) -> None:
+    """
+    ローカルでの変更をAnkiWebに送信する。
+    こちらは既に実データ(今回の変更)を含むため、初回同期のような
+    「作り直し」はせず、通常の同期呼び出しのみ軽くリトライする。
     """
     last_err = None
     for i in range(1, attempts + 1):
         try:
+            out = col.sync_collection(auth, True)
+            if out.required == out.NO_CHANGES:
+                log("同期完了(変更を送信しました)")
+                return
+
+            server_usn = out.server_media_usn if hasattr(out, "server_media_usn") else None
+            upload = out.required == out.FULL_UPLOAD
+            col.close_for_full_sync()
             col.full_upload_or_download(auth=auth, server_usn=server_usn, upload=upload)
+            log("同期完了(フル同期で反映しました)")
             return
         except Exception as e:  # noqa: BLE001
             last_err = e
-            log(f"full_upload_or_download 失敗(試行{i}/{attempts}): {e}")
+            log(f"変更の送信に失敗しました(試行{i}/{attempts}): {e}")
             if i < attempts:
-                time.sleep(5 * i)
-                col.close_for_full_sync()
+                time.sleep(10 * i)
     raise last_err
-
-
-def do_sync(col: Collection, auth) -> None:
-    """通常同期を実行し、必要ならfull download/uploadにフォールバックする"""
-    out = col.sync_collection(auth, True)  # メディア同期も有効化(フル同期時のサイズ情報欠落を防ぐ)
-
-    if out.required == out.NO_CHANGES:
-        log("同期完了(差分なし、または通常マージ済み)")
-        return
-
-    server_usn = out.server_media_usn if hasattr(out, "server_media_usn") else None
-
-    if out.required == out.FULL_DOWNLOAD:
-        log("初回 or サーバー側が最新のため FULL_DOWNLOAD を実行します")
-        col.close_for_full_sync()
-        _full_sync_with_retry(col, auth, server_usn, upload=False)
-    elif out.required == out.FULL_UPLOAD:
-        log("ローカル側が最新のため FULL_UPLOAD を実行します")
-        col.close_for_full_sync()
-        _full_sync_with_retry(col, auth, server_usn, upload=True)
-    else:
-        # 本来はデスクトップ版がユーザーに upload/download を確認するケース。
-        # 無人実行では安全側に倒し、絶対にサーバーのデータを消さないよう
-        # "download" (サーバーを正として取り込む) をデフォルトにする。
-        log("警告: 通常はユーザー確認が必要な競合状態です。安全のためdownloadを選択します。")
-        col.close_for_full_sync()
-        _full_sync_with_retry(col, auth, server_usn, upload=False)
 
 
 def days_left_until(deadline_str: str) -> int:
@@ -221,18 +268,8 @@ def main() -> int:
 
     Path(COLLECTION_PATH).parent.mkdir(parents=True, exist_ok=True)
 
-    col = Collection(COLLECTION_PATH)
+    col, auth = initial_login_and_sync(username, password, COLLECTION_PATH)
     try:
-        log("AnkiWebにログイン中...")
-        auth = col.sync_login(username=username, password=password, endpoint=None)
-
-        log("同期(取得)を実行中...")
-        do_sync(col, auth)
-
-        # full_upload_or_downloadの後はコレクションを開き直す必要がある
-        col.close()
-        col = Collection(COLLECTION_PATH)
-
         export_deck_list(col)
 
         changed = False
@@ -245,10 +282,8 @@ def main() -> int:
             log("config.json に設定がありません(even_decks / sequential_groups が空)")
 
         if changed:
-            col.close()
-            col = Collection(COLLECTION_PATH)
             log("変更をAnkiWebに反映(同期・送信)中...")
-            do_sync(col, auth)
+            push_changes(col, auth)
         else:
             log("変更なし。反映はスキップします。")
 
